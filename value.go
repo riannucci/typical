@@ -60,6 +60,11 @@ func (v *value) Error() error {
 }
 
 func newData(data []reflect.Value) *value {
+	for i, d := range data {
+		if !d.IsValid() {
+			data[i] = valueOfNilInterface
+		}
+	}
 	return &value{data, dataToTypeID(false, data)}
 }
 

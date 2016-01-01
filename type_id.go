@@ -20,11 +20,12 @@ func dataToTypeID(isErr bool, data []reflect.Value) typeID {
 		buf.WriteRune('!')
 	}
 	for i, d := range data {
-		if d.IsValid() {
-			if d.Kind() == reflect.Interface {
-				d = d.Elem()
+		if d.Kind() == reflect.Interface {
+			if d = d.Elem(); d.IsValid() {
 				data[i] = d
 			}
+		}
+		if d.IsValid() {
 			t := d.Type()
 			types[i] = t
 			writeSmallest(buf, reflect.ValueOf(t).Pointer())

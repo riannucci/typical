@@ -72,7 +72,11 @@ func match(tid typeID, fnT reflect.Type) bool {
 		if t == inT {
 			continue
 		}
-		if t.AssignableTo(inT) {
+		if t == nil {
+			if inT == typeOfInterface {
+				continue
+			}
+		} else if t.AssignableTo(inT) {
 			if !isErr {
 				continue
 			} else if inT.Implements(typeOfError) {
@@ -123,7 +127,11 @@ func notNillableOrNotNil(v *reflect.Value) bool {
 }
 
 var (
-	typeOfError = reflect.TypeOf((*error)(nil)).Elem()
+	typeOfError     = reflect.TypeOf((*error)(nil)).Elem()
+	typeOfInterface = reflect.TypeOf((*interface{})(nil)).Elem()
+
+	empty               = interface{}(nil)
+	valueOfNilInterface = reflect.ValueOf(&empty).Elem()
 )
 
 func retDataToValue(fnTyp reflect.Type, data []reflect.Value) Value {
