@@ -6,12 +6,15 @@
 package typical
 
 import (
+	"fmt"
 	"reflect"
 )
 
 // Value represents a collection of data, or an error (never both). The Value
-// may be Switched by a variety of functions to produce a new Value, or the
-// data/error may be retrieved from this Value
+// may be switched by a variety of functions to produce a new Value, or the
+// data/error may be retrieved from this Value.
+//
+// When a Value has data (i.e. is not an error), it holds 0 or more values.
 type Value interface {
 	// S does a type-switch on the data in this value. Each consumeFunc must be
 	// a function. Switch will select and execute the first function whose inputs
@@ -28,28 +31,31 @@ type Value interface {
 	// that the last returned value MUST be exactly of type `error` (not simply
 	// something that implements the `error` interface).
 	//
-	// If no function signature matches, S will simply return itself. This means
-	// that data and errors will continue to propagate down a S chain until some
+	// If no function signature matches, S will return itself. This means that
+	// data and errors will continue to propagate down a switch chain until some
 	// function matches either the data or the error.
 	//
-	// You can match a nil data value by having a consumeFunc with an argument
-	// of NilValue. Otherwise a typeless nil will only be matchable by a function
-	// taking `interface{}`.
+	// Panics are not handled specially; if a consumeFunc panics, it will
+	// propagate without any intervention (i.e. it won't be converted to an
+	// error-state Value or anything like that).
 	//
-	// Panics are not handled specially; if a consumeFunction panics, typical
-	// will propagate it without any intervention (i.e. it won't be converted
-	// to an error-state Value or anything like that).
+	// If any value in consumeFuncs is not a function, this will panic.
 	S(consumeFuncs ...interface{}) Value
-
-	// First will return the first datum of this Value, or panic if this Value is
-	// in an error state.
-	First() interface{}
 
 	// FirstErr will return the first datum of this Value or the error.
 	FirstErr() (interface{}, error)
 
-	// All will return all the data in this Value, or panic if this Value is in an
-	// error state.
+	// FirstErr will return the first datum of this Value or the error.
+	AllErr() ([]interface{}, error)
+
+	// First will return the first datum of this Value
+	//
+	// This will or panic if this Value is in an error state.
+	First() interface{}
+
+	// All will return all the data in this Value
+	//
+	// This will panic if this Value is in an error state.
 	All() []interface{}
 
 	// Error returns the current error if this Value is in an error state, or nil
@@ -57,35 +63,27 @@ type Value interface {
 	Error() error
 }
 
-type NilValue struct{}
-
-var (
-	typeOfError     = reflect.TypeOf((*error)(nil)).Elem()
-	typeOfNilValue  = reflect.TypeOf(NilValue{})
-	valueOfNilValue = reflect.ValueOf(NilValue{})
-)
-
 // Do takes a niladic function which returns data and/or an error. It will
 // invoke the function, and return a Value containing either the data or the
 // error.
 //
 // This will panic if `fn` is the wrong type.
 func Do(fn interface{}) Value {
-	cFn, t, err := callable(fn, 0)
-	if err != nil {
-		panic(err)
+	fnV, fnT := callable(fn)
+	if fnT.NumIn() != 0 {
+		panic(fmt.Errorf("typical.Do: %T is not niladic", fn))
 	}
 
-	return retDataToValue(t, cFn.Call(nil))
+	return retDataToValue(fnT, fnV.Call(nil))
 }
 
 // Data creates a data-Value containing the provided data.
 func Data(data ...interface{}) Value {
-	ret := make(dataValue, len(data))
+	dataVals := make([]reflect.Value, len(data))
 	for i, v := range data {
-		ret[i] = reflect.ValueOf(v)
+		dataVals[i] = reflect.ValueOf(v)
 	}
-	return ret
+	return newValue(false, dataVals)
 }
 
 // Error creates an Value containing the provided error.
@@ -95,5 +93,5 @@ func Error(err error) Value {
 	if err == nil {
 		return Data()
 	}
-	return errorValue(reflect.ValueOf(err))
+	return newValue(true, []reflect.Value{reflect.ValueOf(err)})
 }
