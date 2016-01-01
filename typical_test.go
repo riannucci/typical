@@ -7,8 +7,8 @@ import (
 
 func BenchmarkTypical(b *testing.B) {
 	mapL.Lock()
-	matchMap = map[string]map[uintptr]bool{}
-	typeMap = map[string][]reflect.Type{}
+	matchMap = map[typeID]map[uintptr]bool{}
+	typeMap = map[typeID][]reflect.Type{}
 	mapL.Unlock()
 
 	for i := 0; i < b.N; i++ {

@@ -7,8 +7,7 @@ import (
 type value struct {
 	// contains the multiple data or the singular error
 	dataErr []reflect.Value
-	dataID  string
-	isErr   bool
+	dataID  typeID
 }
 
 var _ Value = (*value)(nil)
@@ -54,12 +53,17 @@ func (v *value) AllErr() ([]interface{}, error) {
 }
 
 func (v *value) Error() error {
-	if v.isErr {
+	if v.dataID.isErr() {
 		return v.dataErr[0].Interface().(error)
 	}
 	return nil
 }
 
-func newValue(isErr bool, data []reflect.Value) *value {
-	return &value{data, dataToTypeID(data), isErr}
+func newData(data []reflect.Value) *value {
+	return &value{data, dataToTypeID(false, data)}
+}
+
+func newError(err reflect.Value) *value {
+	data := []reflect.Value{err}
+	return &value{data, dataToTypeID(true, data)}
 }

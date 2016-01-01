@@ -19,16 +19,16 @@ func callable(fn interface{}) (*reflect.Value, reflect.Type) {
 }
 
 var mapL = sync.RWMutex{}
-var matchMap = map[string]map[uintptr]bool{}
-var typeMap = map[string][]reflect.Type{}
+var matchMap = map[typeID]map[uintptr]bool{}
+var typeMap = map[typeID][]reflect.Type{}
 
-func match(typeID string, fnT reflect.Type) bool {
+func match(tid typeID, fnT reflect.Type) bool {
 	fnID := reflect.ValueOf(fnT).Pointer()
 
 	m, ok, types := func() (m, ok bool, types []reflect.Type) {
 		mapL.RLock()
-		if m, ok = matchMap[typeID][fnID]; !ok {
-			types = typeMap[typeID]
+		if m, ok = matchMap[tid][fnID]; !ok {
+			types = typeMap[tid]
 		}
 		mapL.RUnlock()
 		return
@@ -39,11 +39,11 @@ func match(typeID string, fnT reflect.Type) bool {
 
 	set := func(m bool) bool {
 		mapL.Lock()
-		mMap, ok := matchMap[typeID]
+		mMap, ok := matchMap[tid]
 		if ok {
 			mMap[fnID] = m
 		} else {
-			matchMap[typeID] = map[uintptr]bool{fnID: m}
+			matchMap[tid] = map[uintptr]bool{fnID: m}
 		}
 		mapL.Unlock()
 		return m
@@ -61,6 +61,7 @@ func match(typeID string, fnT reflect.Type) bool {
 		return set(false)
 	}
 
+	isErr := tid.isErr()
 	for i, t := range types {
 		inT := reflect.Type(nil)
 		if i < numIn {
@@ -68,8 +69,15 @@ func match(typeID string, fnT reflect.Type) bool {
 		} else {
 			inT = vt
 		}
-		if t == inT || t.AssignableTo(inT) {
+		if t == inT {
 			continue
+		}
+		if t.AssignableTo(inT) {
+			if !isErr {
+				continue
+			} else if inT.Implements(typeOfError) {
+				continue
+			}
 		}
 		return set(false)
 	}
@@ -96,25 +104,6 @@ func writeSmallest(w *bytes.Buffer, p uintptr) {
 	}
 }
 
-func dataToTypeID(data []reflect.Value) string {
-	types := make([]reflect.Type, len(data))
-	buf := &bytes.Buffer{}
-	for i, d := range data {
-		if d.IsValid() {
-			t := d.Type()
-			types[i] = t
-			writeSmallest(buf, reflect.ValueOf(t).Pointer())
-		} else {
-			writeSmallest(buf, 0)
-		}
-	}
-	ret := buf.String()
-	mapL.Lock()
-	typeMap[ret] = types
-	mapL.Unlock()
-	return ret
-}
-
 func (v *value) S(funcs ...interface{}) Value {
 	for _, fn := range funcs {
 		fnV, fnT := callable(fn)
@@ -138,12 +127,16 @@ var (
 )
 
 func retDataToValue(fnTyp reflect.Type, data []reflect.Value) Value {
+	if len(data) == 0 {
+		return newData(nil)
+	}
+
 	lastIdx := fnTyp.NumOut() - 1
 	if fnTyp.Out(lastIdx) == typeOfError {
-		if notNillableOrNotNil(&data[lastIdx]) {
-			return newValue(true, data[lastIdx:])
+		if !data[lastIdx].IsNil() {
+			return newError(data[lastIdx])
 		}
-		return newValue(false, data[:lastIdx])
+		data = data[:lastIdx]
 	}
-	return newValue(false, data)
+	return newData(data)
 }
