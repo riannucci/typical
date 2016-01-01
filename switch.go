@@ -1,10 +1,7 @@
 package typical
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
-	"math"
 	"reflect"
 	"sync"
 )
@@ -87,25 +84,6 @@ func match(tid typeID, fnT reflect.Type) bool {
 	}
 
 	return set(true)
-}
-
-func writeSmallest(w *bytes.Buffer, p uintptr) {
-	buf := [8]byte{}
-	bs := buf[:]
-
-	switch {
-	case p <= math.MaxUint8:
-		w.WriteByte(byte(p))
-	case p <= math.MaxUint16:
-		binary.BigEndian.PutUint16(bs, uint16(p))
-		w.Write(bs[:2])
-	case p <= math.MaxUint32:
-		binary.BigEndian.PutUint32(bs, uint32(p))
-		w.Write(bs[:4])
-	default:
-		binary.BigEndian.PutUint64(bs, uint64(p))
-		w.Write(bs)
-	}
 }
 
 func (v *value) S(funcs ...interface{}) Value {
