@@ -45,6 +45,9 @@ type Value interface {
 	// in an error state.
 	First() interface{}
 
+	// FirstErr will return the first datum of this Value or the error.
+	FirstErr() (interface{}, error)
+
 	// All will return all the data in this Value, or panic if this Value is in an
 	// error state.
 	All() []interface{}

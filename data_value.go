@@ -17,16 +17,20 @@ func (d dataValue) S(consumeFuncs ...interface{}) Value {
 }
 
 func (d dataValue) First() interface{} {
-	if !d[0].IsNil() {
+	if notNillableOrNotNil(&d[0]) {
 		return d[0].Interface()
 	}
 	return nil
 }
 
+func (d dataValue) FirstErr() (interface{}, error) {
+	return d.First(), nil
+}
+
 func (d dataValue) All() []interface{} {
 	ret := make([]interface{}, len(d))
 	for i, v := range d {
-		if !v.IsNil() {
+		if notNillableOrNotNil(&v) {
 			ret[i] = v.Interface()
 		}
 	}

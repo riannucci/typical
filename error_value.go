@@ -20,6 +20,10 @@ func (e errorValue) First() interface{} {
 	panic((reflect.Value)(e).Interface())
 }
 
+func (e errorValue) FirstErr() (interface{}, error) {
+	return nil, e.Error()
+}
+
 func (e errorValue) All() []interface{} {
 	panic((reflect.Value)(e).Interface())
 }

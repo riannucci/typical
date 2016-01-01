@@ -72,10 +72,18 @@ func doSwitch(data []reflect.Value, funcs []interface{}) Value {
 	return nil
 }
 
+func notNillableOrNotNil(v *reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.Interface, reflect.Slice:
+		return !v.IsNil()
+	}
+	return true
+}
+
 func retDataToValue(fnTyp reflect.Type, data []reflect.Value) Value {
 	lastIdx := fnTyp.NumOut() - 1
 	if fnTyp.Out(lastIdx) == typeOfError {
-		if lastDatum := data[lastIdx]; !lastDatum.IsNil() {
+		if lastDatum := data[lastIdx]; notNillableOrNotNil(&lastDatum) {
 			return errorValue(lastDatum)
 		}
 		return dataValue(data[:lastIdx])
