@@ -88,7 +88,7 @@ func Data(data ...interface{}) Value {
 	return newData(dataVals)
 }
 
-// Error creates an Value containing the provided error.
+// Error creates an error-Value containing the provided error.
 //
 // If the error is nil, this is equivalent to Data() (i.e. a niladic data-Value).
 func Error(err error) Value {
