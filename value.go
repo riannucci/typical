@@ -78,12 +78,15 @@ func (v *Value) Error() error {
 }
 
 func newData(fnT reflect.Type, data []reflect.Value) *Value {
-	return &Value{data, dataToTypeID(false, fnT, data)}
+	return &Value{data, dataToTypeID(fnT, data)}
 }
 
 func newError(err reflect.Value) *Value {
+	if err.Kind() == reflect.Interface {
+		err = err.Elem()
+	}
 	data := []reflect.Value{err}
-	return &Value{data, dataToTypeID(true, nil, data)}
+	return &Value{data, errToTypeID(data)}
 }
 
 // Do takes a niladic function which returns data and/or an error. It will
@@ -93,21 +96,12 @@ func newError(err reflect.Value) *Value {
 // This will panic if `fn` is the wrong type.
 func Do(fn interface{}) *Value {
 	fnV := reflect.ValueOf(fn)
-	return retDataToValue(fnV.Type(), fnV.Call(nil))
+	return newData(nil, nil).call(&fnV, fnV.Type())
 }
 
 // Data creates a data-Value containing the provided data.
 func Data(data ...interface{}) *Value {
-	dataVals := make([]reflect.Value, len(data))
-	for i, v := range data {
-		d := reflect.ValueOf(v)
-		if !d.IsValid() {
-			dataVals[i] = valueOfNilInterface
-		} else {
-			dataVals[i] = d
-		}
-	}
-	return newData(nil, dataVals)
+	return newData(nil, IfaceToValues(data...))
 }
 
 // Error creates an error-Value containing the provided error.

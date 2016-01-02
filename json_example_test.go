@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 )
 
 // normally you'd use a json.Encoder to write directly to the stream, but
@@ -18,6 +19,13 @@ func writeJsonToStream(obj interface{}, w io.Writer) error {
 		_, err := w.Write([]byte("\n"))
 		return err
 	}).Error()
+}
+
+func init() {
+	RegisterCommonFunction((func(int) error)(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func(int) error)
+		return IfaceToValues(f(int(in[0].Int())))
+	})
 }
 
 func normalJsonWriteFunction(obj interface{}, w io.Writer) error {

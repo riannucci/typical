@@ -1,83 +1,68 @@
 package typical
 
 import (
+	"fmt"
 	"reflect"
-	"sync"
 )
 
-var mapL = sync.RWMutex{}
-var matchMap = map[typeID]map[uintptr]bool{}
-var typeMap = map[typeID][]reflect.Type{}
+func (v *Value) matchErr(fnT reflect.Type) bool {
+	if fnT.NumIn() != 1 {
+		return false
+	}
+	inT := fnT.In(0)
+	if !inT.Implements(typeOfError) {
+		return false
+	}
 
-func match(tid typeID, fnT reflect.Type) bool {
-	fnID := reflect.ValueOf(fnT).Pointer()
+	inID := reflect.ValueOf(inT).Pointer()
+	key := matchKey{v.dataID, inID}
 
-	m, ok, types := func() (m, ok bool, types []reflect.Type) {
-		mapL.RLock()
-		if m, ok = matchMap[tid][fnID]; !ok {
-			types = typeMap[tid]
-		}
-		mapL.RUnlock()
-		return
-	}()
+	match, ok, fromTypes := getMatchData(key)
 	if ok {
-		return m
+		return match
 	}
 
-	set := func(m bool) bool {
-		mapL.Lock()
-		mMap, ok := matchMap[tid]
-		if ok {
-			mMap[fnID] = m
-		} else {
-			matchMap[tid] = map[uintptr]bool{fnID: m}
-		}
-		mapL.Unlock()
-		return m
-	}
+	return setMatchMap(key, fromTypes[0].AssignableTo(inT))
+}
 
+func (v *Value) match(fnT reflect.Type) bool {
 	vt := reflect.Type(nil)
 	numIn := fnT.NumIn()
 	if fnT.IsVariadic() {
-		if numIn-1 > len(types) {
-			return set(false)
+		if numIn-1 > len(v.dataErr) {
+			return false
 		}
 		vt = fnT.In(numIn - 1).Elem()
 		numIn--
-	} else if len(types) != numIn {
-		return set(false)
+	} else if len(v.dataErr) != numIn {
+		return false
 	}
 
-	isErr := tid.isErr()
-	for i, t := range types {
+	fnID := reflect.ValueOf(fnT).Pointer()
+	key := matchKey{v.dataID, fnID}
+	match, ok, fromTypes := getMatchData(key)
+	if ok {
+		return match
+	}
+
+	for i, t := range fromTypes {
 		inT := reflect.Type(nil)
 		if i < numIn {
 			inT = fnT.In(i)
 		} else {
-			if !isErr && vt == typeOfInterface {
+			if vt == typeOfInterface {
 				// optimize for ...interface{}
 				break
 			}
 			inT = vt
 		}
-		if t == inT {
+		if t == inT || (t == nil && inT == typeOfInterface) || (t != nil && t.AssignableTo(inT)) {
 			continue
 		}
-		if t == nil {
-			if inT == typeOfInterface {
-				continue
-			}
-		} else if t.AssignableTo(inT) {
-			if !isErr {
-				continue
-			} else if inT.Implements(typeOfError) {
-				continue
-			}
-		}
-		return set(false)
+		return setMatchMap(key, false)
 	}
 
-	return set(true)
+	return setMatchMap(key, true)
 }
 
 // S does a type-switch on the data in this value. Each consumeFunc must be
@@ -107,17 +92,22 @@ func match(tid typeID, fnT reflect.Type) bool {
 //
 // If any value in (first, rest...) is not a function, this will panic.
 func (v *Value) S(first interface{}, rest ...interface{}) *Value {
+	matchFn := v.match
+	if v.dataID.isErr() {
+		matchFn = v.matchErr
+	}
+
 	fnV := reflect.ValueOf(first)
 	fnT := fnV.Type()
-	if match(v.dataID, fnT) {
-		return retDataToValue(fnT, fnV.Call(v.dataErr))
+	if matchFn(fnT) {
+		return v.call(&fnV, fnT)
 	}
 
 	for _, fn := range rest {
 		fnV := reflect.ValueOf(fn)
 		fnT := fnV.Type()
-		if match(v.dataID, fnT) {
-			return retDataToValue(fnT, fnV.Call(v.dataErr))
+		if matchFn(fnT) {
+			return v.call(&fnV, fnT)
 		}
 	}
 
@@ -140,7 +130,98 @@ var (
 	valueOfNilInterface = reflect.ValueOf(&empty).Elem()
 )
 
-func retDataToValue(fnT reflect.Type, data []reflect.Value) *Value {
+var commonFunctions = map[reflect.Type]func(interface{}, []reflect.Value) []reflect.Value{}
+
+func RegisterCommonFunction(fn interface{}, impl func(interface{}, []reflect.Value) []reflect.Value) {
+	fnT := reflect.TypeOf(fn)
+	if fnT.Kind() != reflect.Func {
+		panic(fmt.Errorf("typical.RegisterCommonFunction: %T must be a function", fn))
+	}
+	commonFunctions[fnT] = impl
+}
+
+func IfaceToValues(data ...interface{}) []reflect.Value {
+	dataVals := []reflect.Value(nil)
+	if len(data) > 0 {
+		dataVals = make([]reflect.Value, len(data))
+		for i, v := range data {
+			d := reflect.ValueOf(v)
+			if !d.IsValid() {
+				dataVals[i] = valueOfNilInterface
+			} else {
+				dataVals[i] = d
+			}
+		}
+	}
+	return dataVals
+}
+
+func init() {
+	RegisterCommonFunction((func(interface{}) ([]byte, error))(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func(interface{}) ([]byte, error))
+		return IfaceToValues(f(in[0].Interface()))
+	})
+	RegisterCommonFunction((func([]byte) (int, error))(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func([]byte) (int, error))
+		return IfaceToValues(f(in[0].Bytes()))
+	})
+	RegisterCommonFunction((func() int)(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func() int)
+		return IfaceToValues(f())
+	})
+	RegisterCommonFunction((func(int))(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func(int))
+		f(int(in[0].Int()))
+		return nil
+	})
+	RegisterCommonFunction((func() error)(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func() error)
+		return IfaceToValues(f())
+	})
+	RegisterCommonFunction((func(error))(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func(error))
+		f(in[0].Interface().(error))
+		return nil
+	})
+	RegisterCommonFunction((func())(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func())
+		f()
+		return nil
+	})
+	RegisterCommonFunction((func(...interface{}) error)(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func(...interface{}) error)
+		inVals := make([]interface{}, len(in))
+		for i, v := range in {
+			inVals[i] = v.Interface()
+		}
+		return IfaceToValues(f(inVals...))
+	})
+	RegisterCommonFunction((func(interface{}))(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func(interface{}))
+		f(in[0].Interface())
+		return nil
+	})
+	RegisterCommonFunction((func(a interface{}) error)(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func(interface{}) error)
+		return IfaceToValues(f(in[0].Interface()))
+	})
+	RegisterCommonFunction((func(a, b interface{}) error)(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func(a, b interface{}) error)
+		return IfaceToValues(f(in[0].Interface(), in[1].Interface()))
+	})
+}
+
+func (v *Value) call(fnV *reflect.Value, fnT reflect.Type) *Value {
+	fn := (func([]reflect.Value) []reflect.Value)(nil)
+	if cmn, ok := commonFunctions[fnT]; ok {
+		fn = func(in []reflect.Value) []reflect.Value {
+			return cmn(fnV.Interface(), v.dataErr)
+		}
+	} else {
+		fn = fnV.Call
+	}
+	data := fn(v.dataErr)
+
 	if len(data) == 0 {
 		return newData(fnT, nil)
 	}
