@@ -76,7 +76,33 @@ func match(tid typeID, fnT reflect.Type) bool {
 	return set(true)
 }
 
-func (v *value) S(first interface{}, rest ...interface{}) Value {
+// S does a type-switch on the data in this value. Each consumeFunc must be
+// a function. Switch will select and execute the first function whose inputs
+// match the data in this Value. Only one consumeFunc per S will ever be
+// called.
+//
+// If this Value is in an error state, functions will match against the
+// singular error value. This can be used to distinguish between multiple
+// error types. A function consuming the interface type `error` will match
+// any error type. Functions intended to consume errors must have a single
+// argument, and that single argument must either be `error` or a type which
+// implements error.
+//
+// If the consuming function has the signature `func(...) (..., error)`, and
+// returns a non-nil error, the returned Value will be in an error state. Note
+// that the last returned value MUST be exactly of type `error` (not simply
+// something that implements the `error` interface).
+//
+// If no function signature matches, S will return itself. This means that
+// data and errors will continue to propagate down a switch chain until some
+// function matches either the data or the error.
+//
+// Panics are not handled specially; if a consumeFunc panics, it will
+// propagate without any intervention (i.e. it won't be converted to an
+// error-state Value or anything like that).
+//
+// If any value in consumeFuncs is not a function, this will panic.
+func (v *Value) S(first interface{}, rest ...interface{}) *Value {
 	fnV := reflect.ValueOf(first)
 	fnT := fnV.Type()
 	if match(v.dataID, fnT) {
@@ -110,7 +136,7 @@ var (
 	valueOfNilInterface = reflect.ValueOf(&empty).Elem()
 )
 
-func retDataToValue(fnTyp reflect.Type, data []reflect.Value) Value {
+func retDataToValue(fnTyp reflect.Type, data []reflect.Value) *Value {
 	if len(data) == 0 {
 		return newData(nil)
 	}

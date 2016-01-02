@@ -1,18 +1,29 @@
+// Package typical is a promise-style type-switching library for golang.
+//
+// It's probably very silly, but I thought it would be a fun project, and
+// thought that it could make some really ugly error-handling patterns in go
+// much nicer looking (but due to reflection, probably inordinately slow :)).
 package typical
 
 import (
 	"reflect"
 )
 
-type value struct {
+// Value represents a collection of data, or an error (never both). The Value
+// may be switched by a variety of functions to produce a new Value, or the
+// data/error may be retrieved from this Value.
+//
+// When a Value has data (i.e. is not an error), it holds 0 or more values.
+type Value struct {
 	// contains the multiple data or the singular error
 	dataErr []reflect.Value
 	dataID  typeID
 }
 
-var _ Value = (*value)(nil)
-
-func (v *value) First() interface{} {
+// First will return the first datum of this Value
+//
+// This will or panic if this Value is in an error state.
+func (v *Value) First() interface{} {
 	r, err := v.FirstErr()
 	if err != nil {
 		panic(err)
@@ -20,7 +31,8 @@ func (v *value) First() interface{} {
 	return r
 }
 
-func (v *value) FirstErr() (interface{}, error) {
+// FirstErr will return the first datum of this Value or the error.
+func (v *Value) FirstErr() (interface{}, error) {
 	if err := v.Error(); err != nil {
 		return nil, err
 	}
@@ -31,7 +43,10 @@ func (v *value) FirstErr() (interface{}, error) {
 	return nil, nil
 }
 
-func (v *value) All() []interface{} {
+// All will return all the data in this Value
+//
+// This will panic if this Value is in an error state.
+func (v *Value) All() []interface{} {
 	r, err := v.AllErr()
 	if err != nil {
 		panic(err)
@@ -39,7 +54,8 @@ func (v *value) All() []interface{} {
 	return r
 }
 
-func (v *value) AllErr() ([]interface{}, error) {
+// AllErr will return the first datum of this Value or the error.
+func (v *Value) AllErr() ([]interface{}, error) {
 	if err := v.Error(); err != nil {
 		return nil, err
 	}
@@ -52,23 +68,54 @@ func (v *value) AllErr() ([]interface{}, error) {
 	return ret, nil
 }
 
-func (v *value) Error() error {
+// Error returns the current error if this Value is in an error state, or nil
+// otherwise.
+func (v *Value) Error() error {
 	if v.dataID.isErr() {
 		return v.dataErr[0].Interface().(error)
 	}
 	return nil
 }
 
-func newData(data []reflect.Value) *value {
+func newData(data []reflect.Value) *Value {
 	for i, d := range data {
 		if !d.IsValid() {
 			data[i] = valueOfNilInterface
 		}
 	}
-	return &value{data, dataToTypeID(false, data)}
+	return &Value{data, dataToTypeID(false, data)}
 }
 
-func newError(err reflect.Value) *value {
+func newError(err reflect.Value) *Value {
 	data := []reflect.Value{err}
-	return &value{data, dataToTypeID(true, data)}
+	return &Value{data, dataToTypeID(true, data)}
+}
+
+// Do takes a niladic function which returns data and/or an error. It will
+// invoke the function, and return a Value containing either the data or the
+// error.
+//
+// This will panic if `fn` is the wrong type.
+func Do(fn interface{}) *Value {
+	fnV := reflect.ValueOf(fn)
+	return retDataToValue(fnV.Type(), fnV.Call(nil))
+}
+
+// Data creates a data-Value containing the provided data.
+func Data(data ...interface{}) *Value {
+	dataVals := make([]reflect.Value, len(data))
+	for i, v := range data {
+		dataVals[i] = reflect.ValueOf(v)
+	}
+	return newData(dataVals)
+}
+
+// Error creates an error-Value containing the provided error.
+//
+// If the error is nil, this is equivalent to Data() (i.e. a niladic data-Value).
+func Error(err error) *Value {
+	if err == nil {
+		return Data()
+	}
+	return newError(reflect.ValueOf(err))
 }
