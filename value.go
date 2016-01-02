@@ -9,6 +9,10 @@ var (
 	valueOfNilInterface = reflect.ValueOf(&empty).Elem()
 )
 
+type noDataT struct{}
+
+var NoData = noDataT{}
+
 // IfaceToValues is a helper function to convert various values to a slice
 // of reflect.Value.
 func IfaceToValues(data ...interface{}) []reflect.Value {
@@ -39,6 +43,9 @@ type Value struct {
 
 // First will return the first datum of this Value
 //
+// If the Value is niladic (non-error, but no data), this will return the
+// special NoData value.
+//
 // This will or panic if this Value is in an error state.
 func (v Value) First() interface{} {
 	r, err := v.FirstErr()
@@ -57,9 +64,15 @@ func notNillableOrNotNil(v reflect.Value) bool {
 }
 
 // FirstErr will return the first datum of this Value or the error.
+//
+// If the Value is niladic (non-error, but no data), this will return the
+// special NoData value.
 func (v Value) FirstErr() (interface{}, error) {
 	if err := v.Error(); err != nil {
 		return nil, err
+	}
+	if len(v.dataErr) == 0 {
+		return NoData, nil
 	}
 	first := v.dataErr[0]
 	if notNillableOrNotNil(first) {
