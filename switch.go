@@ -103,9 +103,9 @@ func (v *Value) S(first interface{}, rest ...interface{}) *Value {
 		return v.call(&fnV, fnT)
 	}
 
-	for _, fn := range rest {
-		fnV := reflect.ValueOf(fn)
-		fnT := fnV.Type()
+	for _, first = range rest {
+		fnV = reflect.ValueOf(first)
+		fnT = fnV.Type()
 		if matchFn(fnT) {
 			return v.call(&fnV, fnT)
 		}
