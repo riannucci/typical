@@ -6,7 +6,6 @@
 package typical
 
 import (
-	"fmt"
 	"reflect"
 )
 
@@ -42,7 +41,7 @@ type Value interface {
 	// error-state Value or anything like that).
 	//
 	// If any value in consumeFuncs is not a function, this will panic.
-	S(consumeFuncs ...interface{}) Value
+	S(first interface{}, consumeFuncs ...interface{}) Value
 
 	// FirstErr will return the first datum of this Value or the error.
 	FirstErr() (interface{}, error)
@@ -71,12 +70,8 @@ type Value interface {
 //
 // This will panic if `fn` is the wrong type.
 func Do(fn interface{}) Value {
-	fnV, fnT := callable(fn)
-	if fnT.NumIn() != 0 {
-		panic(fmt.Errorf("typical.Do: %T is not niladic", fn))
-	}
-
-	return retDataToValue(fnT, fnV.Call(nil))
+	fnV := reflect.ValueOf(fn)
+	return retDataToValue(fnV.Type(), fnV.Call(nil))
 }
 
 // Data creates a data-Value containing the provided data.

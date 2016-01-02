@@ -1,19 +1,9 @@
 package typical
 
 import (
-	"fmt"
 	"reflect"
 	"sync"
 )
-
-func callable(fn interface{}) (*reflect.Value, reflect.Type) {
-	v := reflect.ValueOf(fn)
-	if v.Kind() != reflect.Func {
-		panic(fmt.Errorf("typical: `fn` has wrong type %T (not a function)", fn))
-	}
-	t := v.Type()
-	return &v, t
-}
 
 var mapL = sync.RWMutex{}
 var matchMap = map[typeID]map[uintptr]bool{}
@@ -86,13 +76,21 @@ func match(tid typeID, fnT reflect.Type) bool {
 	return set(true)
 }
 
-func (v *value) S(funcs ...interface{}) Value {
-	for _, fn := range funcs {
-		fnV, fnT := callable(fn)
+func (v *value) S(first interface{}, rest ...interface{}) Value {
+	fnV := reflect.ValueOf(first)
+	fnT := fnV.Type()
+	if match(v.dataID, fnT) {
+		return retDataToValue(fnT, fnV.Call(v.dataErr))
+	}
+
+	for _, fn := range rest {
+		fnV := reflect.ValueOf(fn)
+		fnT := fnV.Type()
 		if match(v.dataID, fnT) {
 			return retDataToValue(fnT, fnV.Call(v.dataErr))
 		}
 	}
+
 	return v
 }
 
