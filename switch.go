@@ -54,6 +54,10 @@ func match(tid typeID, fnT reflect.Type) bool {
 		if i < numIn {
 			inT = fnT.In(i)
 		} else {
+			if !isErr && vt == typeOfInterface {
+				// optimize for ...interface{}
+				break
+			}
 			inT = vt
 		}
 		if t == inT {
@@ -101,7 +105,7 @@ func match(tid typeID, fnT reflect.Type) bool {
 // propagate without any intervention (i.e. it won't be converted to an
 // error-state Value or anything like that).
 //
-// If any value in consumeFuncs is not a function, this will panic.
+// If any value in (first, rest...) is not a function, this will panic.
 func (v *Value) S(first interface{}, rest ...interface{}) *Value {
 	fnV := reflect.ValueOf(first)
 	fnT := fnV.Type()
