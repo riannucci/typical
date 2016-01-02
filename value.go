@@ -78,11 +78,6 @@ func (v *Value) Error() error {
 }
 
 func newData(data []reflect.Value) *Value {
-	for i, d := range data {
-		if !d.IsValid() {
-			data[i] = valueOfNilInterface
-		}
-	}
 	return &Value{data, dataToTypeID(false, data)}
 }
 
@@ -105,7 +100,12 @@ func Do(fn interface{}) *Value {
 func Data(data ...interface{}) *Value {
 	dataVals := make([]reflect.Value, len(data))
 	for i, v := range data {
-		dataVals[i] = reflect.ValueOf(v)
+		d := reflect.ValueOf(v)
+		if !d.IsValid() {
+			dataVals[i] = valueOfNilInterface
+		} else {
+			dataVals[i] = d
+		}
 	}
 	return newData(dataVals)
 }
