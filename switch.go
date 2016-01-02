@@ -4,66 +4,6 @@ import (
 	"reflect"
 )
 
-func (v *Value) matchErr(fnT reflect.Type) bool {
-	if fnT.NumIn() != 1 {
-		return false
-	}
-	inT := fnT.In(0)
-	if !inT.Implements(typeOfError) {
-		return false
-	}
-
-	inID := reflect.ValueOf(inT).Pointer()
-	key := matchKey{v.dataID, inID}
-
-	match, ok, fromTypes := getMatchData(key)
-	if ok {
-		return match
-	}
-
-	return setMatchMap(key, fromTypes[0].AssignableTo(inT))
-}
-
-func (v *Value) match(fnT reflect.Type) bool {
-	vt := reflect.Type(nil)
-	numIn := fnT.NumIn()
-	if fnT.IsVariadic() {
-		if numIn-1 > len(v.dataErr) {
-			return false
-		}
-		vt = fnT.In(numIn - 1).Elem()
-		numIn--
-	} else if len(v.dataErr) != numIn {
-		return false
-	}
-
-	fnID := reflect.ValueOf(fnT).Pointer()
-	key := matchKey{v.dataID, fnID}
-	match, ok, fromTypes := getMatchData(key)
-	if ok {
-		return match
-	}
-
-	for i, t := range fromTypes {
-		inT := reflect.Type(nil)
-		if i < numIn {
-			inT = fnT.In(i)
-		} else {
-			if vt == typeOfInterface {
-				// optimize for ...interface{}
-				break
-			}
-			inT = vt
-		}
-		if t == inT || (t == nil && inT == typeOfInterface) || (t != nil && t.AssignableTo(inT)) {
-			continue
-		}
-		return setMatchMap(key, false)
-	}
-
-	return setMatchMap(key, true)
-}
-
 // S does a type-switch on the data in this value. Each consumeFunc must be
 // a function. Switch will select and execute the first function whose inputs
 // match the data in this Value. Only one consumeFunc per S will ever be
@@ -91,59 +31,33 @@ func (v *Value) match(fnT reflect.Type) bool {
 //
 // If any value in (first, rest...) is not a function, this will panic.
 func (v *Value) S(first interface{}, rest ...interface{}) *Value {
-	matchFn := v.match
-	if v.dataID.isErr() {
-		matchFn = v.matchErr
+	matchFn := match
+	if v.isErr {
+		matchFn = matchErr
 	}
 
 	fnV := reflect.ValueOf(first)
 	fnT := fnV.Type()
-	if matchFn(fnT) {
-		return v.call(&fnV, fnT)
+	if matchFn(fnT, v.dataErr) {
+		return v.call(fnV, fnT)
 	}
 
-	for _, first = range rest {
-		fnV = reflect.ValueOf(first)
+	for i := range rest {
+		fnV = reflect.ValueOf(rest[i])
 		fnT = fnV.Type()
-		if matchFn(fnT) {
-			return v.call(&fnV, fnT)
+		if matchFn(fnT, v.dataErr) {
+			return v.call(fnV, fnT)
 		}
 	}
 
 	return v
 }
 
-func notNillableOrNotNil(v reflect.Value) bool {
-	switch v.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.Interface, reflect.Slice:
-		return !v.IsNil()
-	}
-	return true
-}
-
 var (
-	typeOfError     = reflect.TypeOf((*error)(nil)).Elem()
-	typeOfInterface = reflect.TypeOf((*interface{})(nil)).Elem()
-
-	empty               = interface{}(nil)
-	valueOfNilInterface = reflect.ValueOf(&empty).Elem()
+	typeOfError = reflect.TypeOf((*error)(nil)).Elem()
 )
 
-func IfaceToValues(data ...interface{}) []reflect.Value {
-	dataVals := []reflect.Value(nil)
-	if len(data) > 0 {
-		dataVals = make([]reflect.Value, len(data))
-		for i, v := range data {
-			dataVals[i] = reflect.ValueOf(v)
-			if !dataVals[i].IsValid() {
-				dataVals[i] = valueOfNilInterface
-			}
-		}
-	}
-	return dataVals
-}
-
-func (v *Value) call(fnV *reflect.Value, fnT reflect.Type) *Value {
+func (v *Value) call(fnV reflect.Value, fnT reflect.Type) *Value {
 	fn := (func([]reflect.Value) []reflect.Value)(nil)
 	if cmn, ok := commonFunctions[fnT]; ok {
 		fn = func(in []reflect.Value) []reflect.Value {
@@ -155,7 +69,7 @@ func (v *Value) call(fnV *reflect.Value, fnT reflect.Type) *Value {
 	data := fn(v.dataErr)
 
 	if len(data) == 0 {
-		return newData(fnT, nil)
+		return newData(nil)
 	}
 
 	lastIdx := fnT.NumOut() - 1
@@ -165,5 +79,5 @@ func (v *Value) call(fnV *reflect.Value, fnT reflect.Type) *Value {
 		}
 		data = data[:lastIdx]
 	}
-	return newData(fnT, data)
+	return newData(data)
 }

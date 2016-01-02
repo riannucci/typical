@@ -9,6 +9,27 @@ import (
 	"reflect"
 )
 
+var (
+	empty               = interface{}(nil)
+	valueOfNilInterface = reflect.ValueOf(&empty).Elem()
+)
+
+// IfaceToValues is a helper function to convert various values to a slice
+// of reflect.Value.
+func IfaceToValues(data ...interface{}) []reflect.Value {
+	dataVals := []reflect.Value(nil)
+	if len(data) > 0 {
+		dataVals = make([]reflect.Value, len(data))
+		for i, v := range data {
+			dataVals[i] = reflect.ValueOf(v)
+			if !dataVals[i].IsValid() {
+				dataVals[i] = valueOfNilInterface
+			}
+		}
+	}
+	return dataVals
+}
+
 // Value represents a collection of data, or an error (never both). The Value
 // may be switched by a variety of functions to produce a new Value, or the
 // data/error may be retrieved from this Value.
@@ -17,7 +38,8 @@ import (
 type Value struct {
 	// contains the multiple data or the singular error
 	dataErr []reflect.Value
-	dataID  typeID
+	isErr   bool
+	//dataID  typeID
 }
 
 // First will return the first datum of this Value
@@ -29,6 +51,14 @@ func (v *Value) First() interface{} {
 		panic(err)
 	}
 	return r
+}
+
+func notNillableOrNotNil(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.Interface, reflect.Slice:
+		return !v.IsNil()
+	}
+	return true
 }
 
 // FirstErr will return the first datum of this Value or the error.
@@ -71,22 +101,18 @@ func (v *Value) AllErr() ([]interface{}, error) {
 // Error returns the current error if this Value is in an error state, or nil
 // otherwise.
 func (v *Value) Error() error {
-	if v.dataID.isErr() {
+	if v.isErr {
 		return v.dataErr[0].Interface().(error)
 	}
 	return nil
 }
 
-func newData(fnT reflect.Type, data []reflect.Value) *Value {
-	return &Value{data, dataToTypeID(fnT, data)}
+func newData(data []reflect.Value) *Value {
+	return &Value{data, false}
 }
 
 func newError(err reflect.Value) *Value {
-	if err.Kind() == reflect.Interface {
-		err = err.Elem()
-	}
-	data := []reflect.Value{err}
-	return &Value{data, errToTypeID(data)}
+	return &Value{[]reflect.Value{err}, true}
 }
 
 // Do takes a niladic function which returns data and/or an error. It will
@@ -96,12 +122,12 @@ func newError(err reflect.Value) *Value {
 // This will panic if `fn` is the wrong type.
 func Do(fn interface{}) *Value {
 	fnV := reflect.ValueOf(fn)
-	return newData(nil, nil).call(&fnV, fnV.Type())
+	return newData(nil).call(fnV, fnV.Type())
 }
 
 // Data creates a data-Value containing the provided data.
 func Data(data ...interface{}) *Value {
-	return newData(nil, IfaceToValues(data...))
+	return newData(IfaceToValues(data...))
 }
 
 // Error creates an error-Value containing the provided error.
