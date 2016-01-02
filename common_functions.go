@@ -60,10 +60,6 @@ func init() {
 		f(in[0].Interface())
 		return nil
 	})
-	RegisterCommonFunction((func(a interface{}) error)(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
-		f := fnI.(func(interface{}) error)
-		return IfaceToValues(f(in[0].Interface()))
-	})
 	RegisterCommonFunction((func(a, b interface{}) error)(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
 		f := fnI.(func(a, b interface{}) error)
 		return IfaceToValues(f(in[0].Interface(), in[1].Interface()))

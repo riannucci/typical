@@ -23,30 +23,41 @@ func match(fnT reflect.Type, data []reflect.Value) bool {
 	vt := reflect.Type(nil)
 	numIn := fnT.NumIn()
 	if fnT.IsVariadic() {
-		if numIn-1 > len(data) {
+		numIn--
+		if numIn > len(data) {
 			return false
 		}
-		vt = fnT.In(numIn - 1).Elem()
-		numIn--
+		if numIn < len(data) {
+			vt = fnT.In(numIn).Elem()
+		}
 	} else if len(data) != numIn {
 		return false
 	}
 
+	i := 0
 	t := reflect.Type(nil)
 	inT := vt
-	for i := range data {
+	for ; i < numIn; i++ {
 		t = data[i].Type()
-		inT = vt
-		if i < numIn {
-			inT = fnT.In(i)
-		} else if vt == typeOfInterface {
-			// optimize for ...interface{}
-			return true
-		}
-		if t == inT || (t == nil && inT == typeOfInterface) || (t != nil && t.AssignableTo(inT)) {
+		inT = fnT.In(i)
+		if (t == nil && inT == typeOfInterface) || (t != nil && t.AssignableTo(inT)) {
 			continue
 		}
 		return false
 	}
+	if vt != nil {
+		if vt == typeOfInterface {
+			// quick optimization for ...interface{}
+			return true
+		}
+		for ; i < len(data); i++ {
+			t = data[i].Type()
+			if t != nil && t.AssignableTo(vt) {
+				continue
+			}
+			return false
+		}
+	}
+
 	return true
 }
