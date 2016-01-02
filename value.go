@@ -37,7 +37,7 @@ func (v *Value) FirstErr() (interface{}, error) {
 		return nil, err
 	}
 	first := v.dataErr[0]
-	if notNillableOrNotNil(&first) {
+	if notNillableOrNotNil(first) {
 		return first.Interface(), nil
 	}
 	return nil, nil
@@ -61,7 +61,7 @@ func (v *Value) AllErr() ([]interface{}, error) {
 	}
 	ret := make([]interface{}, len(v.dataErr))
 	for i, v := range v.dataErr {
-		if notNillableOrNotNil(&v) {
+		if notNillableOrNotNil(v) {
 			ret[i] = v.Interface()
 		}
 	}
