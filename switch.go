@@ -30,7 +30,7 @@ import (
 // error-state Value or anything like that).
 //
 // If any value in (first, rest...) is not a function, this will panic.
-func (v *Value) S(first interface{}, rest ...interface{}) *Value {
+func (v Value) S(first interface{}, rest ...interface{}) Value {
 	matchFn := match
 	if v.isErr {
 		matchFn = matchErr
@@ -57,7 +57,7 @@ var (
 	typeOfError = reflect.TypeOf((*error)(nil)).Elem()
 )
 
-func (v *Value) call(fnV reflect.Value, fnT reflect.Type) *Value {
+func (v Value) call(fnV reflect.Value, fnT reflect.Type) Value {
 	fn := (func([]reflect.Value) []reflect.Value)(nil)
 	if cmn, ok := commonFunctions[fnT]; ok {
 		fn = func(in []reflect.Value) []reflect.Value {

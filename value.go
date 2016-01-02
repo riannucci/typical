@@ -45,7 +45,7 @@ type Value struct {
 // First will return the first datum of this Value
 //
 // This will or panic if this Value is in an error state.
-func (v *Value) First() interface{} {
+func (v Value) First() interface{} {
 	r, err := v.FirstErr()
 	if err != nil {
 		panic(err)
@@ -62,7 +62,7 @@ func notNillableOrNotNil(v reflect.Value) bool {
 }
 
 // FirstErr will return the first datum of this Value or the error.
-func (v *Value) FirstErr() (interface{}, error) {
+func (v Value) FirstErr() (interface{}, error) {
 	if err := v.Error(); err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (v *Value) FirstErr() (interface{}, error) {
 // All will return all the data in this Value
 //
 // This will panic if this Value is in an error state.
-func (v *Value) All() []interface{} {
+func (v Value) All() []interface{} {
 	r, err := v.AllErr()
 	if err != nil {
 		panic(err)
@@ -85,7 +85,7 @@ func (v *Value) All() []interface{} {
 }
 
 // AllErr will return the first datum of this Value or the error.
-func (v *Value) AllErr() ([]interface{}, error) {
+func (v Value) AllErr() ([]interface{}, error) {
 	if err := v.Error(); err != nil {
 		return nil, err
 	}
@@ -100,19 +100,19 @@ func (v *Value) AllErr() ([]interface{}, error) {
 
 // Error returns the current error if this Value is in an error state, or nil
 // otherwise.
-func (v *Value) Error() error {
+func (v Value) Error() error {
 	if v.isErr {
 		return v.dataErr[0].Interface().(error)
 	}
 	return nil
 }
 
-func newData(data []reflect.Value) *Value {
-	return &Value{data, false}
+func newData(data []reflect.Value) Value {
+	return Value{data, false}
 }
 
-func newError(err reflect.Value) *Value {
-	return &Value{[]reflect.Value{err}, true}
+func newError(err reflect.Value) Value {
+	return Value{[]reflect.Value{err}, true}
 }
 
 // Do takes a niladic function which returns data and/or an error. It will
@@ -120,20 +120,20 @@ func newError(err reflect.Value) *Value {
 // error.
 //
 // This will panic if `fn` is the wrong type.
-func Do(fn interface{}) *Value {
+func Do(fn interface{}) Value {
 	fnV := reflect.ValueOf(fn)
 	return newData(nil).call(fnV, fnV.Type())
 }
 
 // Data creates a data-Value containing the provided data.
-func Data(data ...interface{}) *Value {
+func Data(data ...interface{}) Value {
 	return newData(IfaceToValues(data...))
 }
 
 // Error creates an error-Value containing the provided error.
 //
 // If the error is nil, this is equivalent to Data() (i.e. a niladic data-Value).
-func Error(err error) *Value {
+func Error(err error) Value {
 	if err == nil {
 		return Data()
 	}
