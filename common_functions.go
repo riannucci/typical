@@ -7,6 +7,24 @@ import (
 
 var commonFunctions = map[reflect.Type]func(interface{}, []reflect.Value) []reflect.Value{}
 
+// RegisterCommonFunction allows you to optimize typical's function call
+// mechanism. Without registering a function, typical uses reflect.Call to
+// invoke functions. However, if you register a function signature, typical
+// can invoke this function type more directly, which is much faster, and
+// cuts down on a lot of garbage collection junk.
+//
+// Example:
+//   RegisterCommonFunction((func(string) error)(nil), func(fn interface{}, args []reflect.Value) (out []reflect.Value) {
+//     return IfaceToValues(fn.(func(string) error)(args[0].Interface().(string)))
+//   })
+//
+// The following function signatures are implemented by default:
+//   func(interface{}) ([]byte, error)
+//   func([]byte) (int, error)
+//   func() (error)
+//   func(error)
+//   func()
+//   func(...interface{}) error
 func RegisterCommonFunction(fn interface{}, impl func(interface{}, []reflect.Value) []reflect.Value) {
 	fnT := reflect.TypeOf(fn)
 	if fnT.Kind() != reflect.Func {
@@ -23,15 +41,6 @@ func init() {
 	RegisterCommonFunction((func([]byte) (int, error))(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
 		f := fnI.(func([]byte) (int, error))
 		return IfaceToValues(f(in[0].Bytes()))
-	})
-	RegisterCommonFunction((func() int)(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
-		f := fnI.(func() int)
-		return IfaceToValues(f())
-	})
-	RegisterCommonFunction((func(int))(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
-		f := fnI.(func(int))
-		f(int(in[0].Int()))
-		return nil
 	})
 	RegisterCommonFunction((func() error)(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
 		f := fnI.(func() error)
@@ -54,14 +63,5 @@ func init() {
 			inVals[i] = v.Interface()
 		}
 		return IfaceToValues(f(inVals...))
-	})
-	RegisterCommonFunction((func(interface{}))(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
-		f := fnI.(func(interface{}))
-		f(in[0].Interface())
-		return nil
-	})
-	RegisterCommonFunction((func(a, b interface{}) error)(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
-		f := fnI.(func(a, b interface{}) error)
-		return IfaceToValues(f(in[0].Interface(), in[1].Interface()))
 	})
 }

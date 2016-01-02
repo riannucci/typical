@@ -2,6 +2,7 @@ package typical
 
 import (
 	"fmt"
+	"reflect"
 )
 
 type mySpecialError struct{ msg string }
@@ -31,6 +32,19 @@ func handle(fn interface{}) {
 			fmt.Println("got other error:", err)
 		},
 	)
+}
+
+func init() {
+	RegisterCommonFunction((func(interface{}))(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func(interface{}))
+		f(in[0].Interface())
+		return nil
+	})
+	RegisterCommonFunction((func(int))(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func(int))
+		f(int(in[0].Int()))
+		return nil
+	})
 }
 
 // Shows how error handling can work

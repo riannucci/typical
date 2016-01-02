@@ -6,6 +6,10 @@ import (
 	"testing"
 )
 
+func init() {
+	EnableNotify = true
+}
+
 func BenchmarkTypical(b *testing.B) {
 	buf := &bytes.Buffer{}
 

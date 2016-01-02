@@ -2,6 +2,7 @@ package typical
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -39,6 +40,13 @@ func sum(vals ...interface{}) (interface{}, error) {
 		func(vals ...interface{}) error {
 			return fmt.Errorf("unsupported types:", vals...)
 		}).FirstErr()
+}
+
+func init() {
+	RegisterCommonFunction((func(a, b interface{}) error)(nil), func(fnI interface{}, in []reflect.Value) []reflect.Value {
+		f := fnI.(func(a, b interface{}) error)
+		return IfaceToValues(f(in[0].Interface(), in[1].Interface()))
+	})
 }
 
 // Shows the power of pattern matching

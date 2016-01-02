@@ -1,8 +1,14 @@
 package typical
 
 import (
+	"fmt"
+	"os"
 	"reflect"
 )
+
+// EnableNotify makes typical print a line to stdout for every function it
+// calls which is not registered in commonFunctions.
+var EnableNotify = false
 
 // S does a type-switch on the data in this value. Each consumeFunc must be
 // a function. Switch will select and execute the first function whose inputs
@@ -62,6 +68,9 @@ func (v Value) call(fnV reflect.Value, fnT reflect.Type) Value {
 	if cmn, ok := commonFunctions[fnT]; ok {
 		data = cmn(fnV.Interface(), v.dataErr)
 	} else {
+		if EnableNotify {
+			fmt.Fprintf(os.Stderr, "typical: function not registered: %s\n", fnT)
+		}
 		data = fnV.Call(v.dataErr)
 	}
 

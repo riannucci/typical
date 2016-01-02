@@ -2,7 +2,7 @@
 //
 // It's probably very silly, but I thought it would be a fun project, and
 // thought that it could make some really ugly error-handling patterns in go
-// much nicer looking.
+// much nicer looking. See the Examples for Do() to get an idea.
 //
 // Performance
 //
@@ -11,7 +11,7 @@
 // at ~20000ns/op, but now runs at ~8000ns/op on the same hardware. The
 // conventional implementation takes ~4000ns/op. Allocation is also not
 // horrible; currently `976 B/op   26 allocs/op` vs `504 B/op   10 allocs/op`
-// (with go 1.4.2 on linux).
+// (with go 1.4.2 linux/amd64).
 //
 // These numbers assume that the methods in the switch statements have been
 // preregistered with the RegisterCommonFunction method. Removing this registry
