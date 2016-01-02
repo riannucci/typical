@@ -77,13 +77,13 @@ func (v *Value) Error() error {
 	return nil
 }
 
-func newData(data []reflect.Value) *Value {
-	return &Value{data, dataToTypeID(false, data)}
+func newData(fnT reflect.Type, data []reflect.Value) *Value {
+	return &Value{data, dataToTypeID(false, fnT, data)}
 }
 
 func newError(err reflect.Value) *Value {
 	data := []reflect.Value{err}
-	return &Value{data, dataToTypeID(true, data)}
+	return &Value{data, dataToTypeID(true, nil, data)}
 }
 
 // Do takes a niladic function which returns data and/or an error. It will
@@ -107,7 +107,7 @@ func Data(data ...interface{}) *Value {
 			dataVals[i] = d
 		}
 	}
-	return newData(dataVals)
+	return newData(nil, dataVals)
 }
 
 // Error creates an error-Value containing the provided error.

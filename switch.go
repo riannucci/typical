@@ -140,17 +140,17 @@ var (
 	valueOfNilInterface = reflect.ValueOf(&empty).Elem()
 )
 
-func retDataToValue(fnTyp reflect.Type, data []reflect.Value) *Value {
+func retDataToValue(fnT reflect.Type, data []reflect.Value) *Value {
 	if len(data) == 0 {
-		return newData(nil)
+		return newData(fnT, nil)
 	}
 
-	lastIdx := fnTyp.NumOut() - 1
-	if fnTyp.Out(lastIdx) == typeOfError {
+	lastIdx := fnT.NumOut() - 1
+	if fnT.Out(lastIdx) == typeOfError {
 		if !data[lastIdx].IsNil() {
 			return newError(data[lastIdx])
 		}
 		data = data[:lastIdx]
 	}
-	return newData(data)
+	return newData(fnT, data)
 }
