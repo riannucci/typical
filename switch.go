@@ -58,15 +58,12 @@ var (
 )
 
 func (v Value) call(fnV reflect.Value, fnT reflect.Type) Value {
-	fn := (func([]reflect.Value) []reflect.Value)(nil)
+	data := []reflect.Value(nil)
 	if cmn, ok := commonFunctions[fnT]; ok {
-		fn = func(in []reflect.Value) []reflect.Value {
-			return cmn(fnV.Interface(), v.dataErr)
-		}
+		data = cmn(fnV.Interface(), v.dataErr)
 	} else {
-		fn = fnV.Call
+		data = fnV.Call(v.dataErr)
 	}
-	data := fn(v.dataErr)
 
 	if len(data) == 0 {
 		return newData(nil)

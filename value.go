@@ -1,8 +1,3 @@
-// Package typical is a promise-style type-switching library for golang.
-//
-// It's probably very silly, but I thought it would be a fun project, and
-// thought that it could make some really ugly error-handling patterns in go
-// much nicer looking (but due to reflection, probably inordinately slow :)).
 package typical
 
 import (
